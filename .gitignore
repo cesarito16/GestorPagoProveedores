@@ -1,0 +1,9 @@
+## Carpetas de compilación de .NET
+bin/
+obj/
+.dotnet/
+
+## Configuración de VS Code y entorno
+.vscode/
+*.user
+*.suo
