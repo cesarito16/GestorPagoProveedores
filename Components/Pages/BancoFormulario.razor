@@ -1,0 +1,130 @@
+@page "/bancos/formulario"
+@page "/bancos/formulario/{Codigo}"
+@using Microsoft.EntityFrameworkCore
+@using GestorPagoProveedores.Data
+@inject AppDbContext DbContext
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@rendermode InteractiveServer
+
+<PageTitle>@(_esEdicion ? "Modificar Banco" : "Nuevo Banco")</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6" Color="Color.Primary" Style="font-weight: bold;">
+    @(_esEdicion ? "Modificar Ficha de Banco" : "Registrar Nuevo Banco")
+</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="8" md="6">
+        <MudCard Elevation="2">
+            <MudCardContent Class="pa-6">
+                <MudText Typo="Typo.subtitle1" Class="mb-4" Color="Color.Secondary" Style="font-weight: 500;">
+                    Información General del Banco
+                </MudText>
+
+                <MudTextField @bind-Value="_banco.Codigo" 
+                              Label="Código SBIF (ej: 001)" 
+                              Variant="Variant.Outlined" 
+                              Margin="Margin.Dense"
+                              Disabled="_esEdicion"
+                              Class="mb-4"
+                              MaxLength="5" />
+                              
+                <MudTextField @bind-Value="_banco.NombreBanco" 
+                              Label="Nombre Oficial del Banco" 
+                              Variant="Variant.Outlined" 
+                              Margin="Margin.Dense"
+                              Class="mb-4" />
+            </MudCardContent>
+            
+            <MudCardActions Class="pa-6 pt-0">
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary" 
+                           OnClick="Guardar"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           Style="background-color: #594ae2; color: white; font-weight: bold;">
+                    @(_esEdicion ? "CONFIRMAR CAMBIOS" : "CREAR REGISTRO")
+                </MudButton>
+                
+                <MudButton Variant="Variant.Text" 
+                           Color="Color.Default" 
+                           OnClick="Volver" 
+                           Class="ml-2">
+                    Volver al listado
+                </MudButton>
+            </MudCardActions>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    // Parámetro opcional que viaja en la URL
+    [Parameter] public string? Codigo { get; set; }
+    
+    private Banco _banco = new();
+    private bool _esEdicion = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(Codigo))
+        {
+            _esEdicion = true;
+            
+            // Buscamos directamente en la base el banco original
+            var bancoDb = await DbContext.Bancos.FirstOrDefaultAsync(b => b.Codigo == Codigo);
+            
+            if (bancoDb != null)
+            {
+                _banco = bancoDb; // Enlazamos el formulario al objeto trackeado
+            }
+            else
+            {
+                Snackbar.Add("El banco especificado no existe", Severity.Error);
+                Volver();
+            }
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (string.IsNullOrWhiteSpace(_banco.Codigo) || string.IsNullOrWhiteSpace(_banco.NombreBanco))
+        {
+            Snackbar.Add("Todos los campos son obligatorios", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (!_esEdicion)
+            {
+                // Validación defensiva para altas
+                var existe = await DbContext.Bancos.AnyAsync(b => b.Codigo == _banco.Codigo);
+                if (existe)
+                {
+                    Snackbar.Add($"El código {_banco.Codigo} ya está ocupado", Severity.Error);
+                    return;
+                }
+
+                DbContext.Bancos.Add(_banco);
+                Snackbar.Add("Banco creado exitosamente", Severity.Success);
+            }
+            else
+            {
+                // Entity Framework ya sabe que _banco está modificado porque lo recuperamos en el OnInit
+                DbContext.Bancos.Update(_banco);
+                Snackbar.Add("Banco modificado exitosamente", Severity.Success);
+            }
+
+            await DbContext.SaveChangesAsync();
+            Volver(); // Nos devuelve a la grilla principal
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error en el proceso: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/bancos");
+    }
+}

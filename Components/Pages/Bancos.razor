@@ -1,0 +1,127 @@
+@page "/bancos"
+@using Microsoft.EntityFrameworkCore
+@using GestorPagoProveedores.Data
+@inject AppDbContext DbContext
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@rendermode InteractiveServer
+
+<PageTitle>Mantenedor de Bancos</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-6" Color="Color.Primary" Style="font-weight: bold;">
+    Mantenedor de Bancos
+</MudText>
+
+<MudCard Elevation="1">
+    <MudCardContent>
+        <MudTable Items="@_bancos" 
+                  Hover="true" 
+                  Dense="true" 
+                  Elevation="0" 
+                  Loading="@_loading"
+                  Filter="new Func<Banco,bool>(FiltrarBancos)">
+            
+            <ToolBarContent>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="@(() => Navigation.NavigateTo("/bancos/formulario"))"
+                           Style="background-color: #594ae2; color: white; font-weight: bold;"
+                           Class="mr-4">
+                    AGREGAR BANCO
+                </MudButton>
+                
+                <MudSpacer />
+                
+                <MudTextField @bind-Value="_busquedaTexto" 
+                              Placeholder="Buscar por código o nombre..." 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search" 
+                              IconSize="Size.Medium" 
+                              Class="mt-0"
+                              Clearable="true"
+                              Margin="Margin.Dense"
+                              Variant="Variant.Outlined"
+                              Style="max-width: 350px;" />
+            </ToolBarContent>
+
+            <HeaderContent>
+                <MudTh Style="font-weight: bold; width: 20%;">
+                    <MudTableSortLabel SortBy="new Func<Banco, object>(x => x.Codigo)" InitialDirection="SortDirection.Ascending">
+                        Código
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh Style="font-weight: bold;">
+                    <MudTableSortLabel SortBy="new Func<Banco, object>(x => x.NombreBanco)">
+                        Nombre del Banco
+                    </MudTableSortLabel>
+                </MudTh>
+                <MudTh Style="text-align: right; font-weight: bold; width: 15%;">Acciones</MudTh>
+            </HeaderContent>
+            
+            <RowTemplate>
+                <MudTd DataLabel="Código">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" Style="font-weight: bold;">
+                        @context.Codigo
+                    </MudChip>
+                </MudTd>
+                <MudTd DataLabel="Nombre del Banco">@context.NombreBanco</MudTd>
+                <MudTd DataLabel="Acciones" Style="text-align: right;">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                   Color="Color.Info" 
+                                   Size="Size.Small" 
+                                   OnClick="@(() => Navigation.NavigateTo($"/bancos/formulario/{context.Codigo}"))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                   Color="Color.Error" 
+                                   Size="Size.Small" 
+                                   OnClick="@(() => EliminarBanco(context))" />
+                </MudTd>
+            </RowTemplate>
+            
+            <PagerContent>
+                <MudTablePager InfoFormat="{first_item}-{last_item} de {all_items}" RowsPerPageString="Filas por página:" />
+            </PagerContent>
+        </MudTable>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private List<Banco> _bancos = new();
+    private string _busquedaTexto = string.Empty;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarBancos();
+    }
+
+    private async Task CargarBancos()
+    {
+        _loading = true;
+        _bancos = await DbContext.Bancos.OrderBy(b => b.Codigo).ToListAsync();
+        _loading = false;
+    }
+
+    private bool FiltrarBancos(Banco banco)
+    {
+        if (string.IsNullOrWhiteSpace(_busquedaTexto)) return true;
+        if (banco.Codigo.Contains(_busquedaTexto, StringComparison.OrdinalIgnoreCase)) return true;
+        if (banco.NombreBanco.Contains(_busquedaTexto, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    private async Task EliminarBanco(Banco banco)
+    {
+        try
+        {
+            DbContext.Bancos.Remove(banco);
+            await DbContext.SaveChangesAsync();
+            await CargarBancos();
+            Snackbar.Add("Banco eliminado de la base de datos", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"No se pudo eliminar: {ex.Message}", Severity.Error);
+        }
+    }
+}
